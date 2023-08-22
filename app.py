@@ -1,4 +1,4 @@
-from flask import Flask,render_template,Response,jsonify,request
+from flask import Flask,Response,jsonify,request
 from ultralytics import YOLO
 from waitress import serve
 from flask_cors import CORS
@@ -7,14 +7,16 @@ import numpy as np
 import cv2
 from sort import Sort
 from collections import defaultdict
+from flask_sockets import Sockets
 import supervision as sv
 #resolucion
 
 flag = False
 app = Flask(__name__)
-#camera=cv2.VideoCapture(0)
+sockets = Sockets(app)
+
 CORS(app)
-model = YOLO('best_2_1.pt')
+model = YOLO('modelos/yolov8s.pt')
 
 # Store the track history
 track_history = defaultdict(lambda: [])
@@ -78,7 +80,6 @@ def generatePrediction():
                 results = model.track(frame,agnostic_nms=True ,imgsz=640,conf=0.6, persist=True,verbose=False)
                 frame = results[0].orig_img
                 detections = sv.Detections.from_yolov8(results[0])
-                cantidad_vehiculos = len(detections)
                 if results[0].boxes.id is not None:
                     detections.tracker_id = results[0].boxes.id.cpu().numpy().astype(int)
 
@@ -91,13 +92,11 @@ def generatePrediction():
                 for zone, zone_annotator, box_annotator in zip(zones, zone_annotators, box_annotators):
                     mask = zone.trigger(detections=detections)
                     detections_filtered = detections[mask]
+                    print(len(detections_filtered))
                     frame = box_annotator.annotate(scene=frame, detections=detections_filtered,labels=labels)
                     frame = zone_annotator.annotate(scene=frame)
                     line_counter.trigger(detections=detections_filtered)
                     line_annotator.annotate(frame=frame, line_counter=line_counter)
-
-                
-               
                 _, buffer = cv2.imencode('.jpg', frame)
                 data_procesed = buffer.tobytes()
             else:
@@ -136,6 +135,7 @@ def setParameters():
         aux_areas.append(np.array((data['points'])))
     if len(aux_areas) == 0:
         aux_areas = polygons
+    print(aux_areas)
     zones = [
         sv.PolygonZone(
             polygon=polygon,
@@ -163,14 +163,18 @@ def setParameters():
             text_scale=0.4
             )
         for index
-        in range(len(polygons))
+        in range(len(aux_areas))
     ]
 
 
     dictToReturn = {"status":"ok"}
     return jsonify(dictToReturn)
 
-
+@sockets.route('/echo')
+def echo_socket(ws):
+    while not ws.closed:
+        message = ws.receive()
+        ws.send(message)
 
 @app.route('/predict',methods=['GET'])
 def video():
