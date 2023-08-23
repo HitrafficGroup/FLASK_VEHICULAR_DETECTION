@@ -1,21 +1,20 @@
 from flask import Flask,Response,jsonify,request
+from flask_cors import CORS
+from flask_socketio import SocketIO,send
 from ultralytics import YOLO
 from waitress import serve
-from flask_cors import CORS
 import imutils
 import numpy as np
 import cv2
 from sort import Sort
 from collections import defaultdict
-from flask_sockets import Sockets
 import supervision as sv
 #resolucion
 
 flag = False
 app = Flask(__name__)
-sockets = Sockets(app)
-
 CORS(app)
+socketio = SocketIO(app,cors_allowed_origins="*")
 model = YOLO('modelos/yolov8s.pt')
 
 # Store the track history
@@ -43,7 +42,7 @@ zones = [
 zone_annotators = [
     sv.PolygonZoneAnnotator(
         zone=zone,
-        color=colors.by_idx(index),
+        color=colors.by_idx(1),
         thickness=1,
         text_thickness=1,
         text_scale=0.4
@@ -53,21 +52,27 @@ zone_annotators = [
 ]
 box_annotators = [
     sv.BoxAnnotator(
-        color=colors.by_idx(index),
+        color=colors.by_idx(0),
         thickness=1,
         text_thickness=1,
-        text_scale=0.4
+        text_scale=0.2,
+        text_padding=1
         )
     for index
     in range(len(polygons))
 ]
 
+#variables para enviar
+datos_ia = [{"detecciones":0,"conteo":0,"color":'rgba(14, 98, 81 ,  1)'}]
+colores = ["rgba(14, 98, 81 ,  1)"]
 
 def generatePrediction():
     global flag 
     global zones
     global zone_annotators
     global box_annotators
+    global datos_ia
+    global colores
     video_path = "videos/pruebas1.mp4"
     camera = cv2.VideoCapture(video_path)
     while (camera.isOpened()):
@@ -88,15 +93,19 @@ def generatePrediction():
                     for _, confidence, class_id, tracker_id
                     in detections
                 ]
-      
-                for zone, zone_annotator, box_annotator in zip(zones, zone_annotators, box_annotators):
+                aux_datos_ia = []
+
+                for zone, zone_annotator, box_annotator,color in zip(zones, zone_annotators, box_annotators,colores):
+
                     mask = zone.trigger(detections=detections)
                     detections_filtered = detections[mask]
-                    print(len(detections_filtered))
                     frame = box_annotator.annotate(scene=frame, detections=detections_filtered,labels=labels)
                     frame = zone_annotator.annotate(scene=frame)
                     line_counter.trigger(detections=detections_filtered)
-                    line_annotator.annotate(frame=frame, line_counter=line_counter)
+                    aux_datos_ia.append({"detecciones":len(detections_filtered),"conteo":line_counter.out_count,"color":color})
+
+                datos_ia = aux_datos_ia
+                    
                 _, buffer = cv2.imencode('.jpg', frame)
                 data_procesed = buffer.tobytes()
             else:
@@ -126,16 +135,22 @@ def connectIA():
 
 @app.route('/setParams', methods=['POST'])
 def setParameters():
+    global colores
     global zones
     global zone_annotators
     global box_annotators
+    aux_colores = []
     aux_areas = []
     json_data = request.get_json(force=True) 
     for data in json_data:
         aux_areas.append(np.array((data['points'])))
+        aux_colores.append(data['color'])
+
     if len(aux_areas) == 0:
         aux_areas = polygons
-    print(aux_areas)
+    else:
+        colores = aux_colores
+    print(colores)
     zones = [
         sv.PolygonZone(
             polygon=polygon,
@@ -147,7 +162,7 @@ def setParameters():
     zone_annotators = [
     sv.PolygonZoneAnnotator(
         zone=zone,
-        color=colors.by_idx(index),
+        color=colors.by_idx(index+1),
         thickness=1,
         text_thickness=1,
         text_scale=0.4
@@ -157,10 +172,11 @@ def setParameters():
     ]
     box_annotators = [
         sv.BoxAnnotator(
-            color=colors.by_idx(index),
+            color=colors.by_idx(0),
             thickness=1,
             text_thickness=1,
-            text_scale=0.4
+            text_scale=0.2,
+            text_padding=1
             )
         for index
         in range(len(aux_areas))
@@ -170,16 +186,15 @@ def setParameters():
     dictToReturn = {"status":"ok"}
     return jsonify(dictToReturn)
 
-@sockets.route('/echo')
-def echo_socket(ws):
-    while not ws.closed:
-        message = ws.receive()
-        ws.send(message)
 
 @app.route('/predict',methods=['GET'])
 def video():
     return Response(generatePrediction(),mimetype='multipart/x-mixed-replace; boundary=frame')
 
+@app.route('/values',methods=['GET'])
+def send_values():
+    global contador
+    return jsonify({"data":datos_ia})
 mode = "dev"
 if __name__ == '__main__':
     if mode == "dev":
