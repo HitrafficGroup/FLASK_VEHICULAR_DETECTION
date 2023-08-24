@@ -100,7 +100,7 @@ def generatePrediction():
                     mask = zone.trigger(detections=detections)
                     detections_filtered = detections[mask]
                     frame = box_annotator.annotate(scene=frame, detections=detections_filtered,labels=labels)
-                    frame = zone_annotator.annotate(scene=frame)
+                    #frame = zone_annotator.annotate(scene=frame)
                     line_counter.trigger(detections=detections_filtered)
                     aux_datos_ia.append({"detecciones":len(detections_filtered),"conteo":line_counter.out_count,"color":color})
 
