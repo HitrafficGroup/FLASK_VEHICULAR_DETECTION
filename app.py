@@ -15,7 +15,7 @@ flag = False
 app = Flask(__name__)
 CORS(app)
 socketio = SocketIO(app,cors_allowed_origins="*")
-model = YOLO('modelos/yolov8s.pt')
+model = YOLO('modelos/best_2_1.pt')
 
 # Store the track history
 track_history = defaultdict(lambda: [])
@@ -73,7 +73,8 @@ def generatePrediction():
     global box_annotators
     global datos_ia
     global colores
-    video_path = "videos/pruebas1.mp4"
+    global line_counter
+    video_path = "videos/corto1.mp4"
     camera = cv2.VideoCapture(video_path)
     while (camera.isOpened()):
         success,frame=camera.read()
@@ -102,6 +103,7 @@ def generatePrediction():
                     frame = box_annotator.annotate(scene=frame, detections=detections_filtered,labels=labels)
                     #frame = zone_annotator.annotate(scene=frame)
                     line_counter.trigger(detections=detections_filtered)
+                    line_annotator.annotate(frame=frame, line_counter=line_counter)
                     aux_datos_ia.append({"detecciones":len(detections_filtered),"conteo":line_counter.out_count,"color":color})
 
                 datos_ia = aux_datos_ia
@@ -142,9 +144,11 @@ def setParameters():
     aux_colores = []
     aux_areas = []
     json_data = request.get_json(force=True) 
+
     for data in json_data:
         aux_areas.append(np.array((data['points'])))
         aux_colores.append(data['color'])
+
 
     if len(aux_areas) == 0:
         aux_areas = polygons
@@ -195,6 +199,19 @@ def video():
 def send_values():
     global contador
     return jsonify({"data":datos_ia})
+@app.route('/setLinePos', methods=['POST'])
+def setLinePosition():
+    global line_counter
+    json_data = request.get_json(force=True) 
+    line_points = json_data['line_position']
+    print(line_points)
+    LINE_START = sv.Point(line_points[0][0],line_points[0][1])
+    LINE_END = sv.Point(line_points[1][0],line_points[1][1])
+    line_counter = sv.LineZone(start=LINE_START, end=LINE_END)
+
+    dictToReturn = {"status":"ok"}
+    return jsonify(dictToReturn)
+    
 mode = "dev"
 if __name__ == '__main__':
     if mode == "dev":
