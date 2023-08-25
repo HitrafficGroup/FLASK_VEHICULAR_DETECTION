@@ -9,8 +9,12 @@ import cv2
 from sort import Sort
 from collections import defaultdict
 import supervision as sv
-#resolucion
-
+import json
+#esta linea de codigo es para abrir el archivo de configuraciones guardadas
+file_contents = {}
+with open('data.json') as config_file:
+    aux = config_file.read()
+    file_contents = json.loads(aux)
 flag = False
 app = Flask(__name__)
 CORS(app)
@@ -20,16 +24,27 @@ model = YOLO('modelos/best_2_1.pt')
 # Store the track history
 track_history = defaultdict(lambda: [])
 # Loop through the video frames
-LINE_START = sv.Point(120, 150)
-LINE_END = sv.Point(450, 150)
+LINE_START = sv.Point(106, 113)
+LINE_END = sv.Point(340, 113)
 line_counter = sv.LineZone(start=LINE_START, end=LINE_END)
 line_annotator = sv.LineZoneAnnotator(thickness=1, text_thickness=1, text_scale=0.4,text_padding=1)
 colors = sv.ColorPalette.default()
+colores = ["rgba(14, 98, 81 ,  1)"]
 polygons = [
 np.array([
 [0,0],[640, 0],[640, 360],[0, 360],[0, 0]
 ])
 ]
+print(file_contents)
+aux_areas = []
+aux_colores = []
+for data in file_contents:
+    aux_areas.append(np.array((data['points'])))
+    aux_colores.append(data['stroke'])
+    if len(aux_areas) == 0:
+        aux_areas = polygons
+    else:
+        colores = aux_colores
 #caja donde se mostraran los datos
 zones = [
     sv.PolygonZone(
@@ -37,7 +52,7 @@ zones = [
         frame_resolution_wh=(640,360)
     )
     for polygon
-    in polygons
+    in aux_areas
 ]
 zone_annotators = [
     sv.PolygonZoneAnnotator(
@@ -59,12 +74,12 @@ box_annotators = [
         text_padding=1
         )
     for index
-    in range(len(polygons))
+    in range(len(aux_areas))
 ]
 
 #variables para enviar
 datos_ia = [{"detecciones":0,"conteo":0,"color":'rgba(14, 98, 81 ,  1)'}]
-colores = ["rgba(14, 98, 81 ,  1)"]
+
 
 def generatePrediction():
     global flag 
@@ -74,7 +89,7 @@ def generatePrediction():
     global datos_ia
     global colores
     global line_counter
-    video_path = "videos/corto1.mp4"
+    video_path = "videos/pruebas1.mp4"
     camera = cv2.VideoCapture(video_path)
     while (camera.isOpened()):
         success,frame=camera.read()
@@ -144,17 +159,18 @@ def setParameters():
     aux_colores = []
     aux_areas = []
     json_data = request.get_json(force=True) 
+    with open('data.json', 'w', encoding='utf-8') as f:
+        json.dump(json_data, f, ensure_ascii=False, indent=4)
 
     for data in json_data:
         aux_areas.append(np.array((data['points'])))
-        aux_colores.append(data['color'])
+        aux_colores.append(data['stroke'])
 
 
     if len(aux_areas) == 0:
         aux_areas = polygons
     else:
         colores = aux_colores
-    print(colores)
     zones = [
         sv.PolygonZone(
             polygon=polygon,
@@ -199,6 +215,7 @@ def video():
 def send_values():
     global contador
     return jsonify({"data":datos_ia})
+
 @app.route('/setLinePos', methods=['POST'])
 def setLinePosition():
     global line_counter
@@ -211,7 +228,15 @@ def setLinePosition():
 
     dictToReturn = {"status":"ok"}
     return jsonify(dictToReturn)
-    
+
+@app.route('/config', methods=['GET'])
+def sendCurrentConfig():
+    file_contents = {}
+    with open('data.json') as config_file:
+        file_contents = config_file.read()
+    return file_contents
+
+
 mode = "dev"
 if __name__ == '__main__':
     if mode == "dev":
