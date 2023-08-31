@@ -7,7 +7,7 @@ import supervision as sv
 import imutils
 import threading
 import time
-model = YOLO('best_2_1.pt')
+model = YOLO('modelos/best_2_5.pt')
 terminar_proceso = False
 cantidad_vehiculos = 0
 umbral = 1
@@ -31,7 +31,7 @@ def mi_funcion():
 t = threading.Thread(target=mi_funcion)
 t.start()
 # Open the video file
-video_path = "videos/pruebas1.mp4"
+video_path = "videos/corto1.mp4"
 cap = cv2.VideoCapture(video_path)
 
 # Store the track history

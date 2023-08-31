@@ -14,19 +14,12 @@ import time
 polygons = [
 
 np.array([
-[123, 347],[163, 139],[411, 141],[395, 361],[123, 347]
+[0, 0],[640, 0],[640, 360],[0, 360],[0, 0]
 ])
-,
-
-
-np.array([
-[423, 363],[451, 181],[559, 181],[573, 387],[419, 363]
-])
-
     
 ]
 ###
-model = YOLO('best_2_1.pt')
+model = YOLO('modelos/epoca_90.pt')
 terminar_proceso = False
 cantidad_vehiculos = 0
 umbral = 1
@@ -35,7 +28,7 @@ resolution = [640,480]
 
 
 # Open the video file
-video_path = "videos/pruebas1.mp4"
+video_path = "videos/pruebas7.mp4"
 cap = cv2.VideoCapture(video_path)
 
 # Store the track history
@@ -64,9 +57,9 @@ zone_annotators = [
     sv.PolygonZoneAnnotator(
         zone=zone,
         color=colors.by_idx(index),
-        thickness=4,
-        text_thickness=8,
-        text_scale=4
+        thickness=1,
+        text_thickness=1,
+        text_scale=1
     )
     for index, zone
     in enumerate(zones)
@@ -74,9 +67,10 @@ zone_annotators = [
 box_annotators = [
     sv.BoxAnnotator(
         color=colors.by_idx(index),
-        thickness=4,
-        text_thickness=4,
-        text_scale=2
+        thickness=1,
+        text_thickness=1,
+        text_scale=0.2,
+        text_padding=1
         )
     for index
     in range(len(polygons))
