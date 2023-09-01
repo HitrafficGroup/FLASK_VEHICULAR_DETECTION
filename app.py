@@ -175,6 +175,7 @@ def generatePrediction():
             else:
                 _, buffer = cv2.imencode('.jpg', frame)
                 data_procesed = buffer.tobytes()
+                datos_ia = [{"detecciones":0,"conteo":0,"color":'rgba(14, 98, 81 ,  1)'}]
                 line_counter.out_count = 0
             yield(b'--frame\r\n'b'Content-Type: image/jpeg\r\n\r\n' + data_procesed + b'\r\n')
             if cv2.waitKey(1) & 0xFF == ord('q'):
